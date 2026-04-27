@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Müll-Erkennung AI</title>
+    <style>
+      body {
+        font-family: Arial;
+        max-width: 600px;
+        margin: 40px auto;
+      }
+      img {
+        max-width: 100%;
+        margin-top: 10px;
+      }
+      pre {
+        background: #f4f4f4;
+        padding: 10px;
+      }
+      button {
+        padding: 10px 20px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🗑️ Müll erkennen (AI)</h2>
+
+    <input type="file" id="fileInput" accept="image/*" />
+    <br /><br />
+
+    <button onclick="send()">Analysieren</button>
+
+    <h3>Vorschau:</h3>
+    <img id="preview" />
+
+    <h3>Antwort:</h3>
+    <pre id="output">Noch nichts...</pre>
+
+    <script>
+      window.send = async function () {
+        const file = document.getElementById("fileInput").files[0];
+
+        if (!file) {
+          alert("Bitte Bild auswählen");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        document.getElementById("output").textContent = "⏳ Analysiere...";
+
+        const res = await fetch("http://localhost:3000/analyze", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+
+        document.getElementById("output").textContent = data.content;
+      };
+    </script>
+  </body>
+</html>
