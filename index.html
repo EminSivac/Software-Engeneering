@@ -38,6 +38,17 @@
     <pre id="output">Noch nichts...</pre>
 
     <script>
+      const input = document.getElementById("fileInput");
+      const preview = document.getElementById("preview");
+
+      input.addEventListener("change", () => {
+        const file = input.files[0];
+
+        if (file) {
+          preview.src = URL.createObjectURL(file);
+        }
+      });
+
       window.send = async function () {
         const file = document.getElementById("fileInput").files[0];
 

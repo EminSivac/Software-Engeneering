@@ -20,17 +20,23 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
       {
         role: "user",
         content: `
-          Du bist ein Müll-Trennsystem.
+          Du bist ein deutsches Mülltrennsystem.
+
+          Regeln:
+          - Papier → Blaue Tonne
+          - Plastik → Gelber Sack
+          - Bio/Organisch → Biomüll
+          - Rest → Restmüll
 
           Antworte ausschließlich mit gültigem JSON.
           KEIN Text, KEINE Erklärungen.
 
           Format:
-          {"müllart":"","behälter":"","sicherheit":""}
+          {"gegenstand":"","müllart":"","behälter":"","sicherheit":""}
 
           Erlaubte Werte:
-          - müllart: Papier, Plastik, Restmüll, Bio
-          - behälter: Gelber Sack, Blaue Tonne, Restmüll, Biomüll
+          - müllart: Papier, Plastik, Restmüll, Bio/Organisch
+          - behälter: Plastic/Verpackungen Tonne, Papier Tonne, Restmüll Tonne, Bio Tonne
           - sicherheit: hoch, mittel, niedrig
 
           Wenn unsicher → trotzdem best guess.
