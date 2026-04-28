@@ -3,29 +3,57 @@ import multer from "multer";
 import { LMStudioClient } from "@lmstudio/sdk";
 import fs from "fs";
 import cors from "cors";
+import Database from "better-sqlite3";
+
+// Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
+const MODELS = [
+  "mistralai/mistral-7b-instruct-v0.3",
+  "qwen2-vl-2b-instruct",
+  "google/gemma-4-e4b",
+];
+
+// const MODELS = ["google/gemma-4-e4b"];
+
+const db = new Database("results.db");
+
+createTable();
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
 app.use(cors());
 
 const client = new LMStudioClient();
+//Lade die Modelle vorab, damit sie schneller reagieren
+for (const model of MODELS) {
+  client.llm.model(model);
+}
+
+let results = [];
 
 app.post("/analyze", upload.single("image"), async (req, res) => {
   try {
+    // Gegendstand erkennen lassen durch die VLM
     const nameItemResult = await GetNameOfItem("qwen2-vl-2b-instruct", req);
 
-    const result = await GetAIResponse(
-      "mistralai/mistral-7b-instruct-v0.3",
-      nameItemResult,
-    );
+    // Gegenstand durch die LLMs sortieren lassen
+    for (const model of MODELS) {
+      const result = await GetAIResponse(model, nameItemResult);
+      results.push(result);
+    }
 
-    console.log(
-      JsonComp(result, nameItemResult, ["mistralai/mistral-7b-instruct-v0.3"]),
-    );
+    // console.log("Ergebnisse:", results);
 
-    res.json({
-      content: result.content,
-    });
+    // Ergebnisse in DB speichern
+    for (let i = 0; i < MODELS.length; i++) {
+      insertResult(
+        MODELS[i],
+        extractJSON(results[i].content),
+        results[i].stats.totalTimeSec,
+      );
+    }
+
+    // Res für Forntend zurückgeben
+    res.json(JsonCompose(results, nameItemResult));
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -33,13 +61,27 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
 
 app.listen(3000, () => console.log("Server läuft auf Port 3000"));
 
-function JsonComp(result, nameItemResult, AiModel) {
-  let resultJson = '{ "NameItem" : "' + nameItemResult + '",';
-  for (const i of AiModel) {
-    resultJson += '"' + i + '":' + result.content + ",";
-  }
-  resultJson = resultJson.slice(0, -1) + "}";
-  return resultJson;
+function JsonCompose(results, nameItemResult) {
+  const output = {
+    NameItem: nameItemResult,
+  };
+
+  MODELS.forEach((model, index) => {
+    const raw = results[index].content;
+    const cleaned = extractJSON(raw);
+
+    let parsed = null;
+
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      parsed = { error: "invalid json", raw };
+    }
+
+    output[model] = parsed;
+  });
+
+  return output;
 }
 
 async function GetAIResponse(AiModel, ItemName) {
@@ -95,4 +137,47 @@ async function GetNameOfItem(AiModel, req) {
 
   console.log("Name des Gegenstands:", result.content);
   return result.content;
+}
+
+function extractJSON(text) {
+  if (!text) return null;
+
+  // 1. ```json block bevorzugen
+  const codeMatch = text.match(/```json\s*([\s\S]*?)```/i);
+  if (codeMatch) {
+    return cleanJSONString(codeMatch[1].trim());
+  }
+
+  // 2. normales JSON extrahieren (inkl. multiline)
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match) {
+    return cleanJSONString(match[0].trim());
+  }
+
+  return null;
+}
+
+function cleanJSONString(str) {
+  return str.replace(/\n/g, "").replace(/\r/g, "").replace(/\t/g, "").trim();
+}
+
+function insertResult(model, response, latency) {
+  const insert = db.prepare(
+    "INSERT INTO results (model, response, latency) VALUES (?, ?, ?)",
+  );
+  insert.run(model, response, latency);
+}
+
+function createTable() {
+  db.prepare(
+    `
+  CREATE TABLE IF NOT EXISTS results (
+    id INTEGER PRIMARY KEY,
+    model TEXT,
+    response TEXT,
+    latency INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`,
+  ).run();
 }

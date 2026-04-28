@@ -1,8 +1,0 @@
-{
-  "NameItem": "Enveloppe",
-  "mistralai/mistral-7b-instruct-v0.3": {
-    "müllart": "Papier",
-    "behälter": "Papier Tonne",
-    "sicherheit": "hoch"
-  }
-}
