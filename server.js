@@ -28,9 +28,8 @@ for (const model of MODELS) {
   client.llm.model(model);
 }
 
-let results = [];
-
 app.post("/analyze", upload.single("image"), async (req, res) => {
+  let results = [];
   try {
     // Gegendstand erkennen lassen durch die VLM
     const nameItemResult = await GetNameOfItem("qwen2-vl-2b-instruct", req);
