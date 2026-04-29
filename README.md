@@ -42,7 +42,7 @@ Installiertes Modell: `mistralai/mistral-7b-instruct-v0.3`, `qwen/qwen3.5-9b`, `
    - Server aktivieren (Port: 1234)
      - CORS aktivieren
 2. Backend starten
-   - node server.js im Projekt-Pfad eingeben
+   - `node server.js` im Projekt-Pfad eingeben
    - `Server läuft auf: http://localhost:3000`
 3. Frontend öffnen
-   - Einfach `http://localhost:3000` aufrufen
+   - Einfach `http://localhost:3000` ode `http://{ip_des_geräts}:3000` aufrufen
