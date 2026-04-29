@@ -8,7 +8,7 @@ import Database from "better-sqlite3";
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 const MODELS = [
   "mistralai/mistral-7b-instruct-v0.3",
-  "qwen2-vl-2b-instruct",
+  "qwen/qwen3.5-9b",
   "google/gemma-4-e4b",
 ];
 
@@ -19,6 +19,7 @@ const db = new Database("results.db");
 createTable();
 
 const app = express();
+app.use(express.static("public"));
 const upload = multer({ dest: "uploads/" });
 app.use(cors());
 
@@ -32,12 +33,12 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
   let results = [];
   try {
     // Gegendstand erkennen lassen durch die VLM
-    const nameItemResult = await GetNameOfItem("qwen2-vl-2b-instruct", req);
+    const nameItemResult = await GetNameOfItem("qwen/qwen3.5-9b", req);
 
     // Gegenstand durch die LLMs sortieren lassen
     for (const model of MODELS) {
       const result = await GetAIResponse(model, nameItemResult);
-      results.push(result);
+      results.push(result); // in den Results Array packen
     }
 
     // console.log("Ergebnisse:", results);
@@ -46,7 +47,7 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
     for (let i = 0; i < MODELS.length; i++) {
       insertResult(
         MODELS[i],
-        extractJSON(results[i].content),
+        extractJSON(results[i].nonReasoningContent),
         results[i].stats.totalTimeSec,
       );
     }
@@ -66,7 +67,7 @@ function JsonCompose(results, nameItemResult) {
   };
 
   MODELS.forEach((model, index) => {
-    const raw = results[index].content;
+    const raw = results[index].nonReasoningContent;
     const cleaned = extractJSON(raw);
 
     let parsed = null;
@@ -134,8 +135,8 @@ async function GetNameOfItem(AiModel, req) {
     },
   ]);
 
-  console.log("Name des Gegenstands:", result.content);
-  return result.content;
+  console.log("Name des Gegenstands:", result.nonReasoningContent);
+  return result.nonReasoningContent;
 }
 
 function extractJSON(text) {
