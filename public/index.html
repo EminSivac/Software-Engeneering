@@ -198,7 +198,7 @@
         formData.append("image", file);
 
         try {
-          const res = await fetch("http://localhost:3000/analyze", {
+          const res = await fetch(`${window.location.origin}/analyze`, {
             method: "POST",
             body: formData,
           });
