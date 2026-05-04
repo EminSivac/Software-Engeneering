@@ -52,8 +52,10 @@ app.post("/analyze", upload.single("image"), async (req, res) => {
       );
     }
 
+    const nameItem = JSON.parse(extractJSON(nameItemResult));
+
     // Res für Forntend zurückgeben
-    res.json(JsonCompose(results, nameItemResult));
+    res.json(JsonCompose(results, nameItem.name));
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -128,8 +130,11 @@ async function GetNameOfItem(AiModel, req) {
   const result = await model.respond([
     {
       role: "user",
-      content: `
-          Sag mir den Namen des Gegenstands auf dem Bild. Antworte ausschließlich mit einem Wort, KEIN Text, KEINE Erklärungen.
+      content: `     
+      Sag mir den Namen des Gegenstands auf dem Bild. Gerne eine kleine Beschreibung.
+
+      Antoworte als Json mit folgendem Format:
+      {"name":"", "description":""}
           `,
       images: [image],
     },
