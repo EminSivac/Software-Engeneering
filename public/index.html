@@ -90,7 +90,7 @@
         formData.append("image", file);
 
         try {
-          // 👉 startet Job (KEIN Ergebnis mehr direkt!)
+          // startet Job (KEIN Ergebnis mehr direkt!)
           const res = await fetch(`${window.location.origin}/analyze`, {
             method: "POST",
             body: formData,
@@ -113,10 +113,10 @@
             );
             const data = await res.json();
 
-            // 👉 Status anzeigen (Queue + Step)
+            // Status anzeigen (Queue + Step)
             itemDiv.innerHTML = `
               <strong>${data.step}</strong>
-              ${data.position ? `<br>Warteschlange: ${data.position}` : ""}
+              ${data.position ? `${data.position}` : ""}
             `;
 
             if (data.status === "done") {
@@ -125,7 +125,7 @@
 
               const result = data.result;
 
-              // 👉 Ergebnis wie vorher anzeigen
+              // Ergebnis wie vorher anzeigen
               itemDiv.innerHTML = `<strong>Erkannt:</strong> ${result.NameItem}`;
 
               Object.entries(result).forEach(([key, value]) => {

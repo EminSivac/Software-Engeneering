@@ -9,10 +9,10 @@ import Database from "better-sqlite3";
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 const MODELS = [
   "mistralai/mistral-7b-instruct-v0.3",
-  "qwen2-vl-2b-instruct",
   "google/gemma-4-e4b",
+  "qwen/qwen3.5-9b",
 ];
-const VLM = "qwen2-vl-2b-instruct";
+const VLM = "qwen/qwen3.5-9b";
 
 // Globale Jobqueue
 const jobs = {};
@@ -68,6 +68,7 @@ app.listen(3000, () => console.log("Server läuft auf Port 3000"));
 
 // Helper
 async function WastEvaluation(req, job) {
+  console.log(queue);
   let results = [];
 
   job.step = "Objekt wird erkannt";
@@ -103,6 +104,7 @@ async function processQueue() {
 
   const { jobId, req } = queue.shift();
   const job = jobs[jobId];
+  job.position = null;
 
   updatePositions();
 
