@@ -3,115 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>Vergleich – Müll AI</title>
-
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: #f4f6f8;
-        margin: 0;
-        display: flex;
-        justify-content: center;
-      }
-
-      .container {
-        width: 1000px;
-        margin-top: 40px;
-      }
-
-      h1 {
-        text-align: center;
-      }
-
-      .upload {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        text-align: center;
-      }
-
-      button {
-        margin-top: 10px;
-        padding: 12px 20px;
-        border: none;
-        border-radius: 8px;
-        background: #007bff;
-        color: white;
-        cursor: pointer;
-        font-size: 15px;
-      }
-
-      button:hover {
-        background: #0056b3;
-      }
-
-      img {
-        margin-top: 15px;
-        max-width: 300px;
-        border-radius: 8px;
-      }
-
-      .spinner {
-        margin: 20px auto;
-        width: 40px;
-        height: 40px;
-        border: 5px solid #ddd;
-        border-top: 5px solid #007bff;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        display: none;
-      }
-
-      @keyframes spin {
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
-      .item {
-        margin-top: 20px;
-        font-size: 18px;
-        text-align: center;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-top: 20px;
-      }
-
-      .card {
-        background: white;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-      }
-
-      .card h3 {
-        margin-top: 0;
-        font-size: 16px;
-      }
-
-      .field {
-        margin-top: 8px;
-      }
-
-      .label {
-        font-weight: bold;
-        color: #555;
-      }
-
-      .value {
-        margin-left: 5px;
-      }
-
-      .error {
-        color: red;
-        font-size: 13px;
-        margin-top: 10px;
-      }
-    </style>
+    <link rel="stylesheet" href="style.css" />
   </head>
 
   <body>
@@ -154,30 +46,30 @@
 
         if (!data || data.error) {
           card.innerHTML = `
-          <h3>${model}</h3>
-          <div class="error">❌ Kein gültiges JSON</div>
-        `;
+            <h3>${model}</h3>
+            <div class="error">❌ Kein gültiges JSON</div>
+          `;
           return card;
         }
 
         card.innerHTML = `
-        <h3>${model}</h3>
+          <h3>${model}</h3>
 
-        <div class="field">
-          <span class="label">Müllart:</span>
-          <span class="value">${data.müllart || "-"}</span>
-        </div>
+          <div class="field">
+            <span class="label">Müllart:</span>
+            <span class="value">${data.müllart || "-"}</span>
+          </div>
 
-        <div class="field">
-          <span class="label">Behälter:</span>
-          <span class="value">${data.behälter || "-"}</span>
-        </div>
+          <div class="field">
+            <span class="label">Behälter:</span>
+            <span class="value">${data.behälter || "-"}</span>
+          </div>
 
-        <div class="field">
-          <span class="label">Sicherheit:</span>
-          <span class="value">${data.sicherheit || "-"}</span>
-        </div>
-      `;
+          <div class="field">
+            <span class="label">Sicherheit:</span>
+            <span class="value">${data.sicherheit || "-"}</span>
+          </div>
+        `;
 
         return card;
       }
@@ -198,30 +90,62 @@
         formData.append("image", file);
 
         try {
+          // 👉 startet Job (KEIN Ergebnis mehr direkt!)
           const res = await fetch(`${window.location.origin}/analyze`, {
             method: "POST",
             body: formData,
           });
 
-          const data = await res.json();
+          const { jobId } = await res.json();
 
-          spinner.style.display = "none";
-
-          // erkannter Gegenstand
-          itemDiv.innerHTML = `<strong>Erkannt:</strong> ${data.NameItem || "-"}`;
-
-          // Karten erstellen
-          Object.entries(data).forEach(([key, value]) => {
-            if (key === "NameItem") return;
-
-            const card = createCard(key, value);
-            resultsDiv.appendChild(card);
-          });
+          pollStatus(jobId);
         } catch (err) {
           spinner.style.display = "none";
-          resultsDiv.innerHTML = `<div class="error">Fehler: ${err.message}</div>`;
+          itemDiv.textContent = "Fehler beim Starten";
         }
       };
+
+      async function pollStatus(jobId) {
+        const interval = setInterval(async () => {
+          try {
+            const res = await fetch(
+              `${window.location.origin}/status/${jobId}`,
+            );
+            const data = await res.json();
+
+            // 👉 Status anzeigen (Queue + Step)
+            itemDiv.innerHTML = `
+              <strong>${data.step}</strong>
+              ${data.position ? `<br>Warteschlange: ${data.position}` : ""}
+            `;
+
+            if (data.status === "done") {
+              clearInterval(interval);
+              spinner.style.display = "none";
+
+              const result = data.result;
+
+              // 👉 Ergebnis wie vorher anzeigen
+              itemDiv.innerHTML = `<strong>Erkannt:</strong> ${result.NameItem}`;
+
+              Object.entries(result).forEach(([key, value]) => {
+                if (key === "NameItem") return;
+                resultsDiv.appendChild(createCard(key, value));
+              });
+            }
+
+            if (data.status === "error") {
+              clearInterval(interval);
+              spinner.style.display = "none";
+              itemDiv.textContent = "Fehler!";
+            }
+          } catch (err) {
+            clearInterval(interval);
+            spinner.style.display = "none";
+            itemDiv.textContent = "Verbindungsfehler";
+          }
+        }, 1000);
+      }
     </script>
   </body>
 </html>

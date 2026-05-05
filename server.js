@@ -1,3 +1,4 @@
+// imports
 import express from "express";
 import multer from "multer";
 import { LMStudioClient } from "@lmstudio/sdk";
@@ -8,60 +9,133 @@ import Database from "better-sqlite3";
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 const MODELS = [
   "mistralai/mistral-7b-instruct-v0.3",
-  "qwen/qwen3.5-9b",
+  "qwen2-vl-2b-instruct",
   "google/gemma-4-e4b",
 ];
+const VLM = "qwen2-vl-2b-instruct";
 
-// const MODELS = ["google/gemma-4-e4b"];
+// Globale Jobqueue
+const jobs = {};
+let queue = [];
+let running = false;
 
+// DB Setup
 const db = new Database("results.db");
-
 createTable();
 
+// Express Setup
 const app = express();
 app.use(express.static("public"));
 const upload = multer({ dest: "uploads/" });
 app.use(cors());
 
+// LMStudio Setup
 const client = new LMStudioClient();
 //Lade die Modelle vorab, damit sie schneller reagieren
 for (const model of MODELS) {
   client.llm.model(model);
 }
 
+// Müllanalyse
 app.post("/analyze", upload.single("image"), async (req, res) => {
-  let results = [];
-  try {
-    // Gegendstand erkennen lassen durch die VLM
-    const nameItemResult = await GetNameOfItem("qwen/qwen3.5-9b", req);
+  const jobId = Date.now().toString();
 
-    // Gegenstand durch die LLMs sortieren lassen
-    for (const model of MODELS) {
-      const result = await GetAIResponse(model, nameItemResult);
-      results.push(result); // in den Results Array packen
-    }
+  jobs[jobId] = {
+    status: "queued",
+    step: "Warteschlange",
+    position: queue.length + 1,
+    result: null,
+  };
 
-    // console.log("Ergebnisse:", results);
+  queue.push({ jobId, req });
 
-    // Ergebnisse in DB speichern
-    for (let i = 0; i < MODELS.length; i++) {
-      insertResult(
-        MODELS[i],
-        extractJSON(results[i].nonReasoningContent),
-        results[i].stats.totalTimeSec,
-      );
-    }
+  processQueue();
 
-    const nameItem = JSON.parse(extractJSON(nameItemResult));
+  res.json({ jobId });
+});
 
-    // Res für Forntend zurückgeben
-    res.json(JsonCompose(results, nameItem.name));
-  } catch (err) {
-    res.status(500).send(err.message);
+app.get("/status/:id", (req, res) => {
+  const job = jobs[req.params.id];
+
+  if (!job) {
+    return res.status(404).send("Job nicht gefunden");
   }
+
+  res.json(job);
 });
 
 app.listen(3000, () => console.log("Server läuft auf Port 3000"));
+
+// Helper
+async function WastEvaluation(req, job) {
+  let results = [];
+
+  job.step = "Objekt wird erkannt";
+
+  const nameItemRaw = await GetNameOfItem(VLM, req);
+  const parsed = safeParse(nameItemRaw);
+  const nameItem = parsed?.name || "unbekannt";
+
+  job.step = "Modelle starten";
+
+  for (const model of MODELS) {
+    job.step = `läuft: ${model}`;
+
+    const result = await GetAIResponse(model, nameItem);
+    results.push(result);
+  }
+
+  job.step = "Speichern";
+
+  for (let i = 0; i < MODELS.length; i++) {
+    const raw = results[i].nonReasoningContent || results[i].content || "";
+
+    insertResult(MODELS[i], extractJSON(raw), results[i].stats.totalTimeSec);
+  }
+
+  return JsonCompose(results, nameItem);
+}
+
+async function processQueue() {
+  if (running || queue.length === 0) return;
+
+  running = true;
+
+  const { jobId, req } = queue.shift();
+  const job = jobs[jobId];
+
+  updatePositions();
+
+  try {
+    const result = await WastEvaluation(req, job);
+
+    job.result = result;
+    job.status = "done";
+    job.step = "Fertig";
+  } catch (err) {
+    job.status = "error";
+    job.step = err.message;
+  }
+
+  running = false;
+  processQueue();
+}
+
+function updatePositions() {
+  queue.forEach((item, index) => {
+    jobs[item.jobId].position = index + 1;
+  });
+}
+
+function safeParse(text) {
+  const cleaned = extractJSON(text);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
 
 function JsonCompose(results, nameItemResult) {
   const output = {
