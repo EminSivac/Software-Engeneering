@@ -7,12 +7,17 @@ import cors from "cors";
 import Database from "better-sqlite3";
 
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
-const MODELS = [
-  "mistralai/mistral-7b-instruct-v0.3",
-  "google/gemma-4-e4b",
-  "qwen/qwen3.5-9b",
-];
-const VLM = "qwen/qwen3.5-9b";
+// Volle Version der APP (Brauchst viel Leistung)
+// const MODELS = [
+//   "mistralai/mistral-7b-instruct-v0.3",
+//   "google/gemma-4-e4b",
+//   "qwen/qwen3.5-9b",
+// ];
+// const VLM = "qwen/qwen3.5-9b";
+
+// Schwachere Modelle für Tests (Schneller, weniger Leistung nötig)
+const MODELS = ["qwen2-vl-2b-instruct"];
+const VLM = "qwen2-vl-2b-instruct";
 
 // Globale Jobqueue
 const jobs = {};
