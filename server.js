@@ -5,20 +5,28 @@ import { LMStudioClient } from "@lmstudio/sdk";
 import fs from "fs";
 import cors from "cors";
 import Database from "better-sqlite3";
+import os from "os";
+
+const memory = os.totalmem() / 1024 / 1024 / 1024;
 
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 // Volle Version der APP (Brauchst viel Leistung)
-// const MODELS = [
-//   "mistralai/mistral-7b-instruct-v0.3",
-//   "google/gemma-4-e4b",
-//   "qwen/qwen3.5-9b",
-// ];
-// const VLM = "qwen/qwen3.5-9b";
 
-// Schwachere Modelle für Tests (Schneller, weniger Leistung nötig)
-const MODELS = ["qwen2-vl-2b-instruct"];
-const VLM = "qwen2-vl-2b-instruct";
+let MODELS;
+let VLM;
 
+if (memory > 16) {
+  MODELS = [
+    "mistralai/mistral-7b-instruct-v0.3",
+    "google/gemma-4-e4b",
+    "qwen/qwen3.5-9b",
+  ];
+  VLM = "qwen/qwen3.5-9b";
+} else {
+  // Schwachere Modelle für Tests (Schneller, weniger Leistung nötig)
+  MODELS = ["qwen2-vl-2b-instruct"];
+  VLM = "qwen2-vl-2b-instruct";
+}
 // Globale Jobqueue
 const jobs = {};
 let queue = [];
