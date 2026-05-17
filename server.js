@@ -9,6 +9,8 @@ import os from "os";
 
 const memory = os.totalmem() / 1024 / 1024 / 1024;
 
+const LMSTUDIOIP = "100.100.113.26:1234"; // IP-Adresse und Port deines LMStudio-Servers
+
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 // Volle Version der APP (Brauchst viel Leistung)
 
@@ -43,7 +45,7 @@ const upload = multer({ dest: "uploads/" });
 app.use(cors());
 
 // LMStudio Setup
-const client = new LMStudioClient();
+const client = new LMStudioClient({ baseUrl: LMSTUDIOIP });
 //Lade die Modelle vorab, damit sie schneller reagieren
 for (const model of MODELS) {
   client.llm.model(model);
