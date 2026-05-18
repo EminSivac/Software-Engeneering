@@ -13,22 +13,13 @@ const LMSTUDIOIP = "ws://100.100.113.26:1234"; // IP-Adresse und Port deines LMS
 
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 // Volle Version der APP (Brauchst viel Leistung)
+const MODELS = [
+  "mistralai/mistral-7b-instruct-v0.3",
+  "google/gemma-4-e4b",
+  "qwen/qwen3.5-9b",
+];
+const VLM = "qwen/qwen3.5-9b";
 
-let MODELS;
-let VLM;
-
-if (memory > 16) {
-  MODELS = [
-    "mistralai/mistral-7b-instruct-v0.3",
-    "google/gemma-4-e4b",
-    "qwen/qwen3.5-9b",
-  ];
-  VLM = "qwen/qwen3.5-9b";
-} else {
-  // Schwachere Modelle für Tests (Schneller, weniger Leistung nötig)
-  MODELS = ["qwen2-vl-2b-instruct"];
-  VLM = "qwen2-vl-2b-instruct";
-}
 // Globale Jobqueue
 const jobs = {};
 let queue = [];
