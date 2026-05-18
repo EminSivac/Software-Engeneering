@@ -5,9 +5,6 @@ import { LMStudioClient } from "@lmstudio/sdk";
 import fs from "fs";
 import cors from "cors";
 import Database from "better-sqlite3";
-import os from "os";
-
-const memory = os.totalmem() / 1024 / 1024 / 1024;
 
 const LMSTUDIOIP = "ws://100.100.113.26:1234"; // IP-Adresse und Port deines LMStudio-Servers
 
