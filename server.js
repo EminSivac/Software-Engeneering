@@ -39,6 +39,8 @@ let running = false;
 // DB Setup
 const db = new Database("results.db");
 createTable();
+createFeedbackTable();
+
 
 // Express Setup
 const app = express();
@@ -277,5 +279,17 @@ function createTable() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `,
+  ).run();
+}
+
+function createFeedbackTable (){
+  db.prepare(
+    `CREATE TABLE IF NOT EXISTS feedback(
+    id  INTEGER PRIMARY KEY,
+    model TEXT
+    rating TEXT
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
   ).run();
 }
