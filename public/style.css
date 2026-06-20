@@ -104,3 +104,21 @@ img {
   font-size: 13px;
   margin-top: 10px;
 }
+
+.vote-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.vote-buttons button {
+  padding: 6px 8px;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  background: #eee;
+}
+
+.vote-buttons button:hover {
+  background: #ddd;
+}
