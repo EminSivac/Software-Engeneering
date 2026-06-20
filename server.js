@@ -6,7 +6,7 @@ import fs from "fs";
 import cors from "cors";
 import Database from "better-sqlite3";
 import os from "os";
-import sharp from "sharp";
+//import sharp from "sharp";
 
 const memory = os.totalmem() / 1024 / 1024 / 1024;
 
@@ -37,7 +37,8 @@ let queue = [];
 let running = false;
 
 // DB Setup
-const db = new Database("results.db");
+const resultsDb = new Database("results.db");
+const feedbackDb = new Database("feedback.db");
 createTable();
 createFeedbackTable();
 
@@ -47,6 +48,8 @@ const app = express();
 app.use(express.static("public"));
 const upload = multer({ dest: "uploads/" });
 app.use(cors());
+
+app.use(express.json());
 
 // LMStudio Setup
 const client = new LMStudioClient();
@@ -262,14 +265,25 @@ function cleanJSONString(str) {
 }
 
 function insertResult(model, response, latency) {
-  const insert = db.prepare(
+  const insert = resultsDb.prepare(
     "INSERT INTO results (model, response, latency) VALUES (?, ?, ?)",
   );
   insert.run(model, response, latency);
 }
 
+app.post("/feedback", (req, res) => {
+  const { model, material, bin, safety, feedback } = req.body;
+
+  feedbackDb.prepare(`
+    INSERT INTO feedback (model, material, bin, safety, feedback)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(model, material, bin, safety, feedback);
+
+  res.json({ success: true });
+});
+
 function createTable() {
-  db.prepare(
+  resultsDb.prepare(
     `
   CREATE TABLE IF NOT EXISTS results (
     id INTEGER PRIMARY KEY,
@@ -283,11 +297,14 @@ function createTable() {
 }
 
 function createFeedbackTable (){
-  db.prepare(
+  feedbackDb.prepare(
     `CREATE TABLE IF NOT EXISTS feedback(
     id  INTEGER PRIMARY KEY,
     model TEXT,
-    rating TEXT,
+    material TEXT,
+    bin TEXT,
+    safety TEXT, 
+    feedback TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`
 
