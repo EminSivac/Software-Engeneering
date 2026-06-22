@@ -6,7 +6,7 @@ import fs from "fs";
 import cors from "cors";
 import Database from "better-sqlite3";
 import os from "os";
-import sharp from "sharp";
+//import sharp from "sharp";
 
 const memory = os.totalmem() / 1024 / 1024 / 1024;
 
@@ -16,14 +16,13 @@ const memory = os.totalmem() / 1024 / 1024 / 1024;
 let MODELS;
 let VLM;
 
-if (memory > 16) {
-  MODELS = [
-    "mistralai/mistral-7b-instruct-v0.3",
-    "google/gemma-4-e4b",
-    "qwen/qwen3.5-9b",
-  ];
-  VLM = "qwen/qwen3.5-9b";
-} else if (memory > 12) {
+MODELS = [
+  "mistralai_-_mistral-7b-instruct-v0.3",
+  "google/gemma-4-e4b"
+];
+
+VLM = "qwen2-vl-2b-instruct";
+/*} else if (memory > 12) {
   MODELS = ["qwen2-vl-2b-instruct", "mistralai/mistral-7b-instruct-v0.3"];
   VLM = "qwen2-vl-2b-instruct";
 } else {
@@ -31,6 +30,7 @@ if (memory > 16) {
   MODELS = ["qwen2-vl-2b-instruct"];
   VLM = "qwen2-vl-2b-instruct";
 }
+  */
 // Globale Jobqueue
 const jobs = {};
 let queue = [];
@@ -50,9 +50,9 @@ app.use(cors());
 // LMStudio Setup
 const client = new LMStudioClient();
 //Lade die Modelle vorab, damit sie schneller reagieren
-for (const model of MODELS) {
-  client.llm.model(model);
-}
+//for (const model of MODELS) {
+// client.llm.model(model);
+//}
 
 // Müllanalyse
 app.post("/analyze", upload.single("image"), async (req, res) => {
