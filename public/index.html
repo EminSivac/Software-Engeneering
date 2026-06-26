@@ -24,6 +24,7 @@
       <div class="item" id="item"></div>
 
       <div class="grid" id="results"></div>
+
     </div>
 
     <script>
@@ -32,6 +33,7 @@
       const spinner = document.getElementById("spinner");
       const resultsDiv = document.getElementById("results");
       const itemDiv = document.getElementById("item");
+      let currentResult = null;
 
       input.addEventListener("change", () => {
         const file = input.files[0];
@@ -69,6 +71,12 @@
             <span class="label">Sicherheit:</span>
             <span class="value">${data.sicherheit || "-"}</span>
           </div>
+
+          <div class="vote-buttons">
+            <button onclick="sendModelFeedback('${model}', 'yes')">Correct</button>
+            <button onclick="sendModelFeedback('${model}', 'no')">Wrong</button>
+            <button onclick="sendModelFeedback('${model}', 'dont_know')">Don't know</button>
+          </div>
         `;
 
         return card;
@@ -81,6 +89,7 @@
           alert("Bitte Bild auswählen");
           return;
         }
+          currentResult = null;
 
         resultsDiv.innerHTML = "";
         itemDiv.textContent = "";
@@ -123,14 +132,29 @@
               clearInterval(interval);
               spinner.style.display = "none";
 
-              const result = data.result;
+            const raw = data.result;
 
+            currentResult = {
+              name: raw.NameItem,
+              models: Object.entries(raw)
+                .filter(([key]) => key !== "NameItem")
+                .map(([model, value]) => ({
+                  model: model,
+                  material: raw.NameItem,
+                  bin: value.behälter,
+                  safety: value.sicherheit
+                }))
+            };
               // Ergebnis wie vorher anzeigen
-              itemDiv.innerHTML = `<strong>Erkannt:</strong> ${result.NameItem}`;
+              itemDiv.innerHTML = `<strong>Erkannt:</strong> ${currentResult.name}`;
 
-              Object.entries(result).forEach(([key, value]) => {
-                if (key === "NameItem") return;
-                resultsDiv.appendChild(createCard(key, value));
+
+              currentResult.models.forEach((m) => {
+                resultsDiv.appendChild(createCard(m.model, {
+                  müllart: m.material,
+                  behälter: m.bin,
+                  sicherheit: m.safety
+                }));
               });
             }
 
@@ -146,6 +170,27 @@
           }
         }, 1000);
       }
+          async function sendModelFeedback(model, value) {
+            if (!currentResult) return;
+
+            const modelData = currentResult.models.find(m => m.model === model);
+
+            await fetch("/feedback", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: model,
+                material: currentResult.name,
+                bin: modelData?.bin,
+                safety: modelData?.safety,
+                feedback: value
+              }),
+            });
+
+            alert(`Feedback saved for ${model}`);
+          }
     </script>
   </body>
 </html>
