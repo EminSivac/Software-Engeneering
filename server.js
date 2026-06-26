@@ -33,7 +33,6 @@ let running = false;
 const resultsDb = new Database("results.db");
 const feedbackDb = new Database("feedback.db");
 createTable();
-createFeedbackTable();
 
 // Express Setup
 const app = express();
