@@ -9,6 +9,7 @@ import Database from "better-sqlite3";
 //import sharp from "sharp";
 
 const LMSTUDIOIP = "ws://100.100.113.26:1234";
+const LOCAL_HOST = "ws://127.0.0.1:1234";
 
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 // Volle Version der APP (Brauchst viel Leistung)
@@ -16,13 +17,12 @@ const LMSTUDIOIP = "ws://100.100.113.26:1234";
 let MODELS;
 let VLM;
 
-
-  MODELS = [
-    "mistralai/mistral-7b-instruct-v0.3",
-    "google/gemma-4-e4b",
-    "qwen/qwen3.5-9b",
-  ];
-  VLM = "qwen/qwen3.5-9b";
+MODELS = [
+  "mistralai/mistral-7b-instruct-v0.3",
+  "google/gemma-4-e4b",
+  "qwen/qwen3.5-9b",
+];
+VLM = "qwen/qwen3.5-9b";
 
 // Globale Jobqueue
 const jobs = {};
@@ -35,7 +35,6 @@ const feedbackDb = new Database("feedback.db");
 createTable();
 createFeedbackTable();
 
-
 // Express Setup
 const app = express();
 app.use(express.static("public"));
@@ -45,7 +44,34 @@ app.use(cors());
 app.use(express.json());
 
 // LMStudio Setup
-const client = new LMStudioClient({ baseUrl: LMSTUDIOIP });
+let client;
+
+async function createClient() {
+  try {
+    const remoteClient = new LMStudioClient({
+      baseUrl: LMSTUDIOIP,
+    });
+
+    // Test, ob der Server erreichbar ist
+    await remoteClient.system.listDownloadedModels();
+
+    console.log("Verbunden mit Remote-LM Studio");
+    return remoteClient;
+  } catch (err) {
+    try {
+      console.log("Remote nicht erreichbar, nutze localhost.");
+
+      return new LMStudioClient({
+        baseUrl: LOCAL_HOST,
+      });
+    } catch (err) {
+      console.error("Fehler beim Verbinden mit lokalem LM Studio:", err);
+      process.exit(1);
+    }
+  }
+}
+
+client = await createClient();
 //Lade die Modelle vorab, damit sie schneller reagieren
 for (const model of MODELS) {
   client.llm.model(model);
@@ -267,17 +293,22 @@ function insertResult(model, response, latency) {
 app.post("/feedback", (req, res) => {
   const { model, material, bin, safety, feedback } = req.body;
 
-  feedbackDb.prepare(`
+  feedbackDb
+    .prepare(
+      `
     INSERT INTO feedback (model, material, bin, safety, feedback)
     VALUES (?, ?, ?, ?, ?)
-  `).run(model, material, bin, safety, feedback);
+  `,
+    )
+    .run(model, material, bin, safety, feedback);
 
   res.json({ success: true });
 });
 
 function createTable() {
-  resultsDb.prepare(
-    `
+  resultsDb
+    .prepare(
+      `
   CREATE TABLE IF NOT EXISTS results (
     id INTEGER PRIMARY KEY,
     model TEXT,
@@ -286,12 +317,14 @@ function createTable() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `,
-  ).run();
+    )
+    .run();
 }
 
-function createFeedbackTable (){
-  feedbackDb.prepare(
-    `CREATE TABLE IF NOT EXISTS feedback(
+function createFeedbackTable() {
+  feedbackDb
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS feedback(
     id  INTEGER PRIMARY KEY,
     model TEXT,
     material TEXT,
@@ -299,7 +332,7 @@ function createFeedbackTable (){
     safety TEXT, 
     feedback TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`
-
-  ).run();
+    )`,
+    )
+    .run();
 }
