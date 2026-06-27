@@ -7,6 +7,7 @@ import cors from "cors";
 import Database from "better-sqlite3";
 import os from "os";
 import sharp from "sharp";
+import { compressImageIfNeeded } from "./imageCompression.js";
 
 const memory = os.totalmem() / 1024 / 1024 / 1024;
 
@@ -87,6 +88,9 @@ app.listen(3000, () => console.log("Server läuft auf Port 3000"));
 // Helper
 async function WastEvaluation(req, job) {
   console.log(queue);
+
+  await compressImageIfNeeded(req.file.path);
+
   let results = [];
 
   job.step = "Objekt wird erkannt";
