@@ -1,3 +1,5 @@
+//um zu testen muss vitest installiert sein, dann kann man `npm test` ausführen
+
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import { compressImageIfNeeded } from "../imageCompression.js";
