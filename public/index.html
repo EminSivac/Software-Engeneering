@@ -72,6 +72,15 @@
             <span class="value">${data.sicherheit || "-"}</span>
           </div>
 
+          <div class="field">
+            <span class="label">Historische Accuracy:</span>
+            <span class="value">
+              ${data.historicalAccuracy !== null 
+              ? `${data.historicalAccuracy}% (${data.sampleCount} Bewertungen)`
+              : "Noch keine Daten"}
+            </span>
+          </div>
+
           <div class="vote-buttons">
             <button onclick="sendModelFeedback('${model}', 'yes')">Correct</button>
             <button onclick="sendModelFeedback('${model}', 'no')">Wrong</button>
@@ -139,10 +148,13 @@
               models: Object.entries(raw)
                 .filter(([key]) => key !== "NameItem")
                 .map(([model, value]) => ({
+                  id: value.id,
                   model: model,
-                  material: raw.NameItem,
+                  material: value.müllart,
                   bin: value.behälter,
-                  safety: value.sicherheit
+                  safety: value.sicherheit,
+                  historicalAccuracy: value.historicalAccuracy,
+                  sampleCount: value.sampleCount
                 }))
             };
               // Ergebnis wie vorher anzeigen
@@ -151,9 +163,12 @@
 
               currentResult.models.forEach((m) => {
                 resultsDiv.appendChild(createCard(m.model, {
+                  id: m.id,
                   müllart: m.material,
                   behälter: m.bin,
-                  sicherheit: m.safety
+                  sicherheit: m.safety,
+                  historicalAccuracy: m.historicalAccuracy,
+                  sampleCount: m.sampleCount
                 }));
               });
             }
@@ -161,7 +176,7 @@
             if (data.status === "error") {
               clearInterval(interval);
               spinner.style.display = "none";
-              itemDiv.textContent = "Fehler!";
+              itemDiv.innerHTML = `<strong>Fehler:</strong><br/>${data.step || "unknown error"}`;
             }
           } catch (err) {
             clearInterval(interval);
@@ -181,8 +196,9 @@
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
+                resultId: modelData.id,
                 model: model,
-                material: currentResult.name,
+                material: modelData.material,
                 bin: modelData?.bin,
                 safety: modelData?.safety,
                 feedback: value
