@@ -6,9 +6,24 @@ import fs from "fs";
 import cors from "cors";
 import Database from "better-sqlite3";
 import os from "os";
-import sharp from "sharp";
 
 const memory = os.totalmem() / 1024 / 1024 / 1024;
+
+export function selectModels(availableMemory) {
+  if (availableMemory > 16) {
+    return {
+      models: ["mistralai/mistral-7b-instruct-v0.3", "google/gemma-4-e4b", "qwen/qwen3.5-9b"],
+      vlm: "qwen/qwen3.5-9b",
+    };
+  }
+  if (availableMemory > 12) {
+    return {
+      models: ["qwen2-vl-2b-instruct", "mistralai/mistral-7b-instruct-v0.3"],
+      vlm: "qwen2-vl-2b-instruct",
+    };
+  }
+  return { models: ["qwen2-vl-2b-instruct"], vlm: "qwen2-vl-2b-instruct" };
+}
 
 // Modelle, die verglichen werden. @All Wir müssen und noch auf genaue einigen.
 // Volle Version der APP (Brauchst viel Leistung)
@@ -16,6 +31,7 @@ const memory = os.totalmem() / 1024 / 1024 / 1024;
 let MODELS;
 let VLM;
 
+/* node:coverage disable */
 if (memory > 16) {
   MODELS = [
     "mistralai/mistral-7b-instruct-v0.3",
@@ -31,30 +47,34 @@ if (memory > 16) {
   MODELS = ["qwen2-vl-2b-instruct"];
   VLM = "qwen2-vl-2b-instruct";
 }
+/* node:coverage enable */
 // Globale Jobqueue
-const jobs = {};
-let queue = [];
-let running = false;
+export const jobs = {};
+export let queue = [];
+export let running = false;
 
 // DB Setup
-const db = new Database("results.db");
+let db = new Database(process.env.RESULTS_DB_PATH || "results.db");
 createTable();
 
-
 // Express Setup
-const app = express();
+export const app = express();
 app.use(express.static("public"));
 const upload = multer({ dest: "uploads/" });
 app.use(cors());
 
 // LMStudio Setup
-const client = new LMStudioClient();
+let client = process.env.NODE_ENV === "test" ? null : new LMStudioClient();
 //Lade die Modelle vorab, damit sie schneller reagieren
-for (const model of MODELS) {
-  client.llm.model(model);
+/* node:coverage disable */
+if (process.env.NODE_ENV !== "test") {
+  for (const model of MODELS) {
+    client.llm.model(model);
+  }
 }
 
 // Müllanalyse
+/* node:coverage enable */
 app.post("/analyze", upload.single("image"), async (req, res) => {
   const jobId = Date.now().toString();
 
@@ -82,10 +102,27 @@ app.get("/status/:id", (req, res) => {
   res.json(job);
 });
 
-app.listen(3000, () => console.log("Server läuft auf Port 3000"));
+export function startServer(port = 3000) {
+  return app.listen(port, () => console.log(`Server läuft auf Port ${port}`));
+}
+
+if (process.env.NODE_ENV !== "test") startServer();
+
+export function configureRuntime({ models, vlm, lmClient, database } = {}) {
+  if (models) MODELS = models;
+  if (vlm) VLM = vlm;
+  if (lmClient) client = lmClient;
+  if (database) db = database;
+}
+
+export function resetQueue() {
+  queue = [];
+  running = false;
+  for (const jobId of Object.keys(jobs)) delete jobs[jobId];
+}
 
 // Helper
-async function WastEvaluation(req, job) {
+export async function WastEvaluation(req, job) {
   console.log(queue);
   let results = [];
 
@@ -115,7 +152,7 @@ async function WastEvaluation(req, job) {
   return JsonCompose(results, nameItem);
 }
 
-async function processQueue() {
+export async function processQueue() {
   if (running || queue.length === 0) return;
 
   running = true;
@@ -138,16 +175,16 @@ async function processQueue() {
   }
 
   running = false;
-  processQueue();
+  await processQueue();
 }
 
-function updatePositions() {
+export function updatePositions() {
   queue.forEach((item, index) => {
     jobs[item.jobId].position = index + 1;
   });
 }
 
-function safeParse(text) {
+export function safeParse(text) {
   const cleaned = extractJSON(text);
 
   try {
@@ -157,7 +194,7 @@ function safeParse(text) {
   }
 }
 
-function JsonCompose(results, nameItemResult) {
+export function JsonCompose(results, nameItemResult) {
   const output = {
     NameItem: nameItemResult,
   };
@@ -180,7 +217,7 @@ function JsonCompose(results, nameItemResult) {
   return output;
 }
 
-async function GetAIResponse(AiModel, ItemName) {
+export async function GetAIResponse(AiModel, ItemName) {
   const model = await client.llm.model(AiModel);
 
   const result = await model.respond([
@@ -216,7 +253,7 @@ async function GetAIResponse(AiModel, ItemName) {
   return result;
 }
 
-async function GetNameOfItem(AiModel, req) {
+export async function GetNameOfItem(AiModel, req) {
   const model = await client.llm.model(AiModel);
 
   const image = await client.files.prepareImage(req.file.path);
@@ -238,7 +275,7 @@ async function GetNameOfItem(AiModel, req) {
   return result.nonReasoningContent;
 }
 
-function extractJSON(text) {
+export function extractJSON(text) {
   if (!text) return null;
 
   // 1. ```json block bevorzugen
@@ -256,18 +293,18 @@ function extractJSON(text) {
   return null;
 }
 
-function cleanJSONString(str) {
+export function cleanJSONString(str) {
   return str.replace(/\n/g, "").replace(/\r/g, "").replace(/\t/g, "").trim();
 }
 
-function insertResult(model, response, latency) {
+export function insertResult(model, response, latency) {
   const insert = db.prepare(
     "INSERT INTO results (model, response, latency) VALUES (?, ?, ?)",
   );
   insert.run(model, response, latency);
 }
 
-function createTable() {
+export function createTable() {
   db.prepare(
     `
   CREATE TABLE IF NOT EXISTS results (
@@ -280,4 +317,3 @@ function createTable() {
 `,
   ).run();
 }
-
