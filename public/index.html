@@ -74,7 +74,7 @@
 
           <div class="vote-buttons">
             <button onclick="sendModelFeedback('${model}', 'yes')">Correct</button>
-            <button onclick="sendModelFeedback('${model}', 'no')">Wrong</button>
+            <button onclick="showCorrection('${model}', 'no')">Wrong</button>
             <button onclick="sendModelFeedback('${model}', 'dont_know')">Don't know</button>
           </div>
         `;
@@ -139,8 +139,9 @@
               models: Object.entries(raw)
                 .filter(([key]) => key !== "NameItem")
                 .map(([model, value]) => ({
+                  id : value.id,
                   model: model,
-                  material: raw.NameItem,
+                  material: value.müllart,
                   bin: value.behälter,
                   safety: value.sicherheit
                 }))
@@ -170,7 +171,7 @@
           }
         }, 1000);
       }
-          async function sendModelFeedback(model, value) {
+          async function sendModelFeedback(model, value, correctMaterial = null) {
             if (!currentResult) return;
 
             const modelData = currentResult.models.find(m => m.model === model);
@@ -181,11 +182,9 @@
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: model,
-                material: currentResult.name,
-                bin: modelData?.bin,
-                safety: modelData?.safety,
-                feedback: value
+                resultId: modelData.id,
+                feedback: value,
+                actualMaterial: value === "yes" ? modelData.material : correctMaterial
               }),
             });
 

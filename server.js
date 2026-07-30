@@ -30,9 +30,8 @@ let queue = [];
 let running = false;
 
 // DB Setup
-const resultsDb = new Database("results.db");
-const feedbackDb = new Database("feedback.db");
-createTable();
+const db = new Database("database.db");
+createTables();
 
 // Express Setup
 const app = express();
@@ -128,13 +127,21 @@ async function WastEvaluation(req, job) {
 
   job.step = "Speichern";
 
+  let resultIds = []; 
+
   for (let i = 0; i < MODELS.length; i++) {
     const raw = results[i].nonReasoningContent || results[i].content || "";
 
-    insertResult(MODELS[i], extractJSON(raw), results[i].stats.totalTimeSec);
+     const id = insertResult(
+        MODELS[i],
+        extractJSON(raw),
+        results[i].stats.totalTimeSec
+      );
+
+ resultIds.push(id);
   }
 
-  return JsonCompose(results, nameItem);
+  return JsonCompose(results, nameItem, resultIds);
 }
 
 async function processQueue() {
@@ -179,7 +186,7 @@ function safeParse(text) {
   }
 }
 
-function JsonCompose(results, nameItemResult) {
+function JsonCompose(results, nameItemResult, resultIds) {
   const output = {
     NameItem: nameItemResult,
   };
@@ -196,7 +203,10 @@ function JsonCompose(results, nameItemResult) {
       parsed = { error: "invalid json", raw };
     }
 
-    output[model] = parsed;
+    output[model] = {
+    id: resultIds[index],
+    ...parsed
+    };
   });
 
   return output;
@@ -283,55 +293,83 @@ function cleanJSONString(str) {
 }
 
 function insertResult(model, response, latency) {
-  const insert = resultsDb.prepare(
-    "INSERT INTO results (model, response, latency) VALUES (?, ?, ?)",
+const parsed = safeParse(response);
+
+  const insert = db.prepare(`
+    INSERT INTO results 
+    (model, response, predicted_material, latency)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  const result = insert.run(
+    model,
+    response,
+    parsed?.müllart || "Unknown",
+    latency
   );
-  insert.run(model, response, latency);
+
+  return result.lastInsertRowid;
+
 }
 
 app.post("/feedback", (req, res) => {
-  const { model, material, bin, safety, feedback } = req.body;
+  const { resultId, feedback, actualMaterial } = req.body;
 
-  feedbackDb
-    .prepare(
+  db.prepare(
       `
-    INSERT INTO feedback (model, material, bin, safety, feedback)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO feedback (result_id, feedback)
+    VALUES (?, ?)
   `,
     )
-    .run(model, material, bin, safety, feedback);
+    .run(resultId, feedback);
+
+   if(feedback === "yes" || feedback === "no"){
+
+   db.prepare(`
+    UPDATE results
+    SET
+      correct=?,
+      actual_material=?
+    WHERE id=?
+   `)
+   .run(
+     feedback === "yes" ? 1 : 0,
+     actualMaterial,
+     resultId
+   );
+
+ }
 
   res.json({ success: true });
 });
 
-function createTable() {
-  resultsDb
-    .prepare(
+function createTables() {
+  db.prepare(
       `
   CREATE TABLE IF NOT EXISTS results (
     id INTEGER PRIMARY KEY,
     model TEXT,
     response TEXT,
+    predicted_material TEXT,
+    actual_material TEXT,
+    correct INTEGER,
     latency INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `,
     )
     .run();
-}
 
-function createFeedbackTable() {
-  feedbackDb
-    .prepare(
+  db.prepare(
       `CREATE TABLE IF NOT EXISTS feedback(
     id  INTEGER PRIMARY KEY,
-    model TEXT,
-    material TEXT,
-    bin TEXT,
-    safety TEXT, 
+    result_id INTEGER,
     feedback TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY(result_id)
+    REFERENCES results(id)
+    )`
     )
     .run();
 }
