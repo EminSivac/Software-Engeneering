@@ -73,18 +73,40 @@
           </div>
 
           <div class="field">
-            <span class="label">Historische Accuracy:</span>
+            <span class="label">Prediction Reliability:</span>
             <span class="value">
-              ${data.historicalAccuracy !== null 
-              ? `${data.historicalAccuracy}% (${data.sampleCount} Bewertungen)`
-              : "Noch keine Daten"}
+              ${data.predictionReliability !== null
+                ? `${data.predictionReliability}% (${data.reliabilitySamples})`
+                : "No data"}
+            </span>
+          </div>
+
+          <div class="field">
+            <span class="label">Category Detection Rate:</span>
+            <span class="value">
+              ${data.categoryDetectionRate !== null
+                ? `${data.categoryDetectionRate}% (${data.detectionSamples})`
+                : "No data"}
             </span>
           </div>
 
           <div class="vote-buttons">
             <button onclick="sendModelFeedback('${model}', 'yes')">Correct</button>
-            <button onclick="sendModelFeedback('${model}', 'no')">Wrong</button>
+            <button onclick="showCorrection('${model}')">Wrong</button>
             <button onclick="sendModelFeedback('${model}', 'dont_know')">Don't know</button>
+          </div>
+
+          <div id="correction-${model}" style="display:none; margin-top:10px;">
+            <select id="material-${model}">
+              <option value="Papier">Papier</option>
+              <option value="Plastic/Verpackungen">Plastic/Verpackungen</option>
+              <option value="Bio/Organisch">Bio/Organisch</option>
+              <option value="Restmüll">Restmüll</option>
+            </select>
+
+            <button onclick="submitCorrection('${model}')">
+              Speichern
+            </button>
           </div>
         `;
 
@@ -153,8 +175,10 @@
                   material: value.müllart,
                   bin: value.behälter,
                   safety: value.sicherheit,
-                  historicalAccuracy: value.historicalAccuracy,
-                  sampleCount: value.sampleCount
+                  predictionReliability: value.predictionReliability,
+                  reliabilitySamples: value.reliabilitySamples,
+                  categoryDetectionRate: value.categoryDetectionRate,
+                  detectionSamples: value.detectionSamples
                 }))
             };
               // Ergebnis wie vorher anzeigen
@@ -167,8 +191,10 @@
                   müllart: m.material,
                   behälter: m.bin,
                   sicherheit: m.safety,
-                  historicalAccuracy: m.historicalAccuracy,
-                  sampleCount: m.sampleCount
+                  predictionReliability: m.predictionReliability,
+                  reliabilitySamples: m.reliabilitySamples,
+                  categoryDetectionRate: m.categoryDetectionRate,
+                  detectionSamples: m.detectionSamples
                 }));
               });
             }
@@ -185,7 +211,8 @@
           }
         }, 1000);
       }
-          async function sendModelFeedback(model, value) {
+          async function sendModelFeedback(model, value, correctMaterial = null) {
+
             if (!currentResult) return;
 
             const modelData = currentResult.models.find(m => m.model === model);
@@ -199,6 +226,7 @@
                 resultId: modelData.id,
                 model: model,
                 material: modelData.material,
+                actualMaterial: correctMaterial,
                 bin: modelData?.bin,
                 safety: modelData?.safety,
                 feedback: value
@@ -207,6 +235,18 @@
 
             alert(`Feedback saved for ${model}`);
           }
+
+          function showCorrection(model){
+            document.getElementById(`correction-${model}`).style.display = "block";
+
+          }
+
+          async function submitCorrection(model){
+            const correctMaterial = document.getElementById(`material-${model}`).value;
+            await sendModelFeedback(model,"no",correctMaterial);
+            document.getElementById(`correction-${model}`).style.display = "none";
+
+}
     </script>
   </body>
 </html>

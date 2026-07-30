@@ -204,13 +204,22 @@ function JsonCompose(results, nameItemResult, resultsId) {
       parsed = { error: "invalid json", raw };
     }
 
-    const stats = parsed ? getHistoricalAccuracy(model, parsed.müllart): { accuracy: null, samples: 0 };
+    const reliability = parsed
+  ? getPredictionReliability(model, parsed.müllart)
+  : { accuracy: null, samples: 0 };
+
+    const detection = parsed
+  ? getCategoryDetectionRate(model, parsed.müllart)
+  : { accuracy: null, samples: 0 };
 
     output[model] = {
         id: resultsId[index],
         ...parsed,
-        historicalAccuracy: stats.accuracy,
-        sampleCount: stats.samples
+        predictionReliability: reliability.accuracy,
+        reliabilitySamples: reliability.samples,
+
+        categoryDetectionRate: detection.accuracy,
+        detectionSamples: detection.samples
 
     };
   });
@@ -307,7 +316,7 @@ function insertResult(model, predicted_material, latency) {
 }
 
 app.post("/feedback", (req, res) => {
-  const { resultId, model, material, bin, safety, feedback } = req.body;
+  const { resultId, model, material, actualMaterial, bin, safety, feedback } = req.body;
 
   feedbackDb
     .prepare(
@@ -326,7 +335,7 @@ app.post("/feedback", (req, res) => {
         WHERE id = ?
     `).run(
         feedback === "yes" ? 1 : 0,
-        material,
+        feedback === "yes" ? material : actualMaterial,
         resultId
     );
 
@@ -370,31 +379,44 @@ function createFeedbackTable() {
     .run();
 }
 
-function getHistoricalAccuracy(model, material) {
+function getPredictionReliability(model, material) {
+  const row = resultsDb.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(correct) as correct
+    FROM results
+    WHERE model = ?
+      AND predicted_material = ?
+      AND correct IS NOT NULL
+  `).get(model, material);
 
-    const row = resultsDb.prepare(`
-        SELECT
-            COUNT(*) as total,
-            SUM(correct) as correct
-        FROM results
-        WHERE model = ?
-        AND predicted_material = ?
-        AND correct IS NOT NULL
-    `).get(model, material);
+  if (!row.total) return { accuracy: null, samples: 0 };
 
-    if (!row.total) {
+  return {
+    accuracy: Math.round((row.correct / row.total) * 100),
+    samples: row.total
+  };
+}
 
-        return {
-            accuracy: null,
-            samples: 0
-        };
-    }
+function getCategoryDetectionRate(model, material) {
+  const row = resultsDb.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(
+        CASE
+          WHEN predicted_material = actual_material
+          THEN 1 ELSE 0
+        END
+      ) as correct
+    FROM results
+    WHERE model = ?
+      AND actual_material = ?
+  `).get(model, material);
 
-    return {
+  if (!row.total) return { accuracy: null, samples: 0 };
 
-        accuracy: Math.round(row.correct / row.total * 100),
-        samples: row.total
-
-    };
-
+  return {
+    accuracy: Math.round((row.correct / row.total) * 100),
+    samples: row.total
+  };
 }
