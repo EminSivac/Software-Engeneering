@@ -1,4 +1,3 @@
-
 # Architecture & Design
 
 ## System Overview
@@ -32,7 +31,6 @@ The system consists of four main components:
 
 The frontend never communicates directly with LM Studio. All communication is handled through the backend.
 
-
 ---
 
 # Components
@@ -52,13 +50,11 @@ It handles:
 - Displaying historical evaluation metrics
 - Collecting user feedback
 
-
 ### Technology
 
 - HTML
 - CSS
 - JavaScript
-
 
 ---
 
@@ -79,12 +75,14 @@ It handles:
 - Processing user feedback
 - Calculating model evaluation metrics
 
-
 ### Technology
 
 - Node.js
 - Express
-
+- Multer
+- CORS
+- LM Studio SDK
+- SQLite 3
 
 ### Request Flow
 
@@ -95,7 +93,6 @@ It handles:
 5. Multiple AI models classify the waste.
 6. Results are stored in the database.
 7. Frontend receives and displays the results.
-
 
 ---
 
@@ -111,7 +108,6 @@ It is responsible for:
 - Processing images
 - Generating waste classification predictions
 
-
 ### Used Models
 
 The system currently compares:
@@ -120,9 +116,7 @@ The system currently compares:
 - Gemma
 - Qwen
 
-
 Using multiple models allows evaluating differences in performance between models.
-
 
 ---
 
@@ -139,7 +133,6 @@ The system uses SQLite databases for:
 - Corrected waste categories
 - Historical model evaluation
 
-
 ### Stored Data
 
 Prediction results:
@@ -150,14 +143,12 @@ Prediction results:
 - Correctness
 - Processing time
 
-
 Feedback data:
 
 - User response
 - Selected correction
 - Timestamp
 - Additional prediction information
-
 
 ---
 
@@ -178,14 +169,13 @@ Advantages:
 - Better privacy
 - Can work without internet access
 
-
 ---
 
 ## Multiple AI Models
 
 ### Decision
 
-The system compares multiple Vision Language Models instead of using only one model.
+The system compares multiple Large Language Models instead of using only one model.
 
 ### Reasoning
 
@@ -197,7 +187,6 @@ For example:
 - Another model might perform better on paper or organic waste.
 
 This makes it possible to evaluate which model performs best for specific waste categories.
-
 
 ---
 
@@ -217,7 +206,6 @@ This allows calculating metrics such as:
 - Prediction Reliability (Precision)
 - Category Detection Rate (Recall)
 
-
 ---
 
 ## Asynchronous Processing Queue
@@ -235,7 +223,6 @@ The queue:
 - Prevents multiple heavy AI processes from running at the same time
 - Shows the user the current processing status
 - Allows multiple users/jobs to be handled safely
-
 
 ---
 

@@ -1,237 +1,168 @@
-# 🗑️ AI Müllvergleich - Waste Classification System
+# AI Waste Classification Comparison
 
-Ein lokales KI-basiertes System zur automatischen Müllklassifizierung. Das Tool analysiert Bilder von Abfällen und empfiehlt den richtigen Behälter, unterstützt durch mehrere Vision-Language-Modelle.
+This project is a local web application for comparing how multiple LM Studio models classify a waste item from an uploaded image.
 
----
+The application:
 
-## 🎯 Was macht dieses Projekt?
+- uploads an image through a browser UI
+- detects the item shown in the image
+- asks multiple local models to classify the waste category
+- shows the predicted waste bin for each model
+- stores results in SQLite
+- collects user feedback to evaluate model performance over time
 
-- **Bildanalyse**: Laden Sie ein Bild eines Abfallstücks hoch
-- **KI-Klassifizierung**: Mehrere lokale KI-Modelle analysieren das Bild parallel
-- **Vergleich**: Sehen Sie die Ergebnisse aller Modelle nebeneinander
-- **Empfehlung**: Das System schlägt den korrekten Müllbehälter vor
-- **Feedback**: Geben Sie Rückmeldungen, um die KI zu verbessern
+## Current Project Scope
 
----
+The current implementation is a lightweight Node.js application with:
 
-## 🚀 Quick Start Guide
+- an Express backend in `server.js`
+- a static frontend in `public/`
+- image uploads handled with Multer
+- local model access through the LM Studio SDK
+- two SQLite databases:
+  - `results.db` for prediction history
+  - `feedback.db` for user feedback
 
-### 1️⃣ Voraussetzungen prüfen
+This is not a cloud service and does not currently include:
 
-**Benötigte Software:**
+- authentication
+- user accounts
+- automated tests
+- Docker setup
+- environment-based configuration
+- HTTPS setup inside the repository
 
-```bash
-# Node.js installieren (Version 18 oder höher)
-# Herunterladen von: https://nodejs.org/
+## How It Works
 
-# LM Studio installieren (für lokale KI-Modelle)
-# Herunterladen von: https://lmstudio.ai/
+1. A user uploads an image in the browser.
+2. The backend creates a queued analysis job.
+3. One model is used to identify the object in the image.
+4. Multiple models classify the waste category for that object.
+5. The backend stores the prediction results.
+6. The frontend polls the job status and displays the results.
+7. The user can submit feedback for each model result.
+
+## Tech Stack
+
+- Node.js
+- Express
+- Multer
+- CORS
+- `@lmstudio/sdk`
+- `better-sqlite3`
+- HTML, CSS, and vanilla JavaScript
+
+## Project Structure
+
+```text
+.
+|-- server.js
+|-- package.json
+|-- public/
+|   |-- index.html
+|   `-- style.css
+|-- docs/
+|   |-- ai-reflection.md
+|   |-- architecture.md
+|   |-- problem-definition.md
+|   `-- requirements.md
+|-- uploads/
+|-- results.db
+`-- feedback.db
 ```
 
-### 2️⃣ Projekt vorbereiten
+## Prerequisites
+
+- Node.js 18 or newer
+- LM Studio running locally or on a trusted reachable host
+- The required models downloaded in LM Studio
+
+The code currently expects LM Studio to be reachable over WebSocket on port `1234`.
+
+## Setup
 
 ```bash
-# Zum Projekt-Verzeichnis wechseln
-cd ...
-
-# Abhängigkeiten installieren
 npm install
+npm start
 ```
 
-### 3️⃣ KI-Modelle in LM Studio laden
+Then open the application in your browser at:
 
-Öffnen Sie **LM Studio** und laden Sie mindestens eines dieser Modelle:
-
-- `ministral-3-3b-instruct-2512` (schnell, weniger Ressourcen)
-- `qwen/qwen3.5-9b` (empfohlen, gute Balance)
-- `google/gemma-4-e4b` (alternative Option)
-
-**Wichtig**: Die Modelle müssen lokal installiert sein - keine Cloud-APIs verwenden!
-
-### 4️⃣ System starten
-
-```bash
-# LM Studio Server starten
-# - Port: 1234
-# - CORS aktivieren (in den Einstellungen)
-# - Server-Status sollte "Running" anzeigen
-
-# Backend starten
-node server.js
-
-# Frontend öffnen
-# http://localhost:3000
-# Oder: http://{Ihr_IP}:3000 (für andere Geräte)
+```text
+http://localhost:3000
 ```
 
----
+## Model Configuration
 
-## 📖 Verwendung
+The currently configured models in `server.js` are:
 
-1. **Bild hochladen**: Klicken Sie auf "Choose File" und wählen Sie ein Bild aus
-2. **Analysieren**: Klicken Sie auf den "Analysieren"-Button
-3. **Ergebnisse sehen**: Vergleichen Sie die Klassifizierungen aller KI-Modelle
-4. **Feedback geben**: Markieren Sie korrekte oder falsche Vorhersagen
+- `ministral-3-3b-instruct-2512`
+- `google/gemma-4-e4b`
+- `qwen/qwen3.5-9b`
 
----
+The object detection step currently uses:
 
-## 🏗️ Architektur
+- `qwen/qwen3.5-9b`
 
-```
-┌─────────────┐
-│   User      │
-└──────┬──────┘
-       ↓
-┌─────────────┐
-│ Frontend    │  ← HTML/CSS/JavaScript
-│ (public/)   │     - Bild-Upload
-│             │     - Ergebnis-Anzeige
-└──────┬──────┘
-       ↓
-┌─────────────┐
-│ Backend     │  ← Node.js + Express
-│ (server.js) │     - API Endpoints
-│             │     - Queue Management
-└──────┬──────┘
-       ├───────────────┐
-       ↓               ↓
-┌─────────────┐  ┌─────────────┐
-│ LM Studio   │  │ SQLite DB   │
-│ API         │  │ (results.db)│
-└─────────────┘  └─────────────┘
-     Vision Language Models
-     - Qwen
-     - Gemma
-     - Ministral
-```
+## API Overview
 
----
+### `POST /analyze`
 
-## 📁 Projektstruktur
+Accepts a multipart form upload with the field name `image`.
 
-```
-Software-Engineering/
-├── server.js          # Haupt-Backend Logik
-├── package.json       # Node.js Abhängigkeiten
-├── public/            # Frontend Dateien
-│   ├── index.html     # Hauptseite
-│   └── style.css      # Styling
-├── docs/              # Dokumentation
-│   ├── architecture.md
-│   ├── requirements.md
-│   └── ai-reflection.md
-├── uploads/           # Temporäre Bild-Uploads
-└── *.db               # SQLite Datenbanken
-```
-
----
-
-## 🎯 API Endpoints
-
-### POST `/analyze`
-
-Bild hochladen zur Analyse
-
-**Request:**
-
-- `multipart/form-data` mit Feld `image`
-
-**Response:**
+Response:
 
 ```json
 {
-  "jobId": "1234567890"
+  "jobId": "..."
 }
 ```
 
-### GET `/status/:id`
+### `GET /status/:id`
 
-Status einer Analyse abrufen
+Returns the status of a queued or completed job.
 
-**Response:**
+### `POST /feedback`
 
-```json
-{
-  "jobId": "1234567890",
-  "status": "completed",
-  "step": "Ergebnis",
-  "position": 0,
-  "result": {
-    "model": "qwen/qwen3.5-9b",
-    "data": { ... }
-  }
-}
-```
+Stores user feedback for a model prediction and updates evaluation data when the user marks a result as correct or wrong.
 
----
+## Stored Evaluation Data
 
-## 🛠️ Konfiguration
+The application calculates two metrics from verified feedback:
 
-### LM Studio IP-Adresse
+- Prediction Reliability
+- Category Detection Rate
 
-In `server.js` können Sie die Verbindungsparameter anpassen:
+These metrics are shown per model and category when enough feedback data exists.
 
-```javascript
-// Remote LM Studio (für Netzwerk-Zugriff)
-const LMSTUDIOIP = "ws://{remote IP}:1234";
+## Security and Privacy Notes
 
-// Lokaler LM Studio
-const LOCAL_HOST = "ws://{localhost}:1234";
-```
+- The README intentionally does not expose concrete private IP addresses or machine-specific paths.
+- Uploaded images are written to the `uploads/` directory.
+- The repository currently does not show cleanup logic for uploaded files after processing.
+- Database files are stored locally in SQLite format.
+- If this project is used outside a local trusted environment, configuration and transport security should be reviewed first.
 
-### Verfügbare Modelle
+## Documentation Check
 
-Das System unterstützt mehrere Modelle gleichzeitig:
+The Markdown files in `docs/` only partially overlap with the actual project state:
 
-```javascript
-MODELS = [
-  "ministral-3-3b-instruct-2512",
-  "google/gemma-4-e4b",
-  "qwen/qwen3.5-9b",
-];
-```
+- `docs/architecture.md`: mostly matches the implemented architecture. It correctly describes the frontend, backend, LM Studio integration, queue, feedback flow, and SQLite-based evaluation at a high level.
+- `docs/requirements.md`: partially overlaps. The functional requirements are close to the project, but some non-functional requirements are not reflected in the codebase, especially HTTPS and measurable performance guarantees.
+- `docs/ai-reflection.md`: currently empty and does not document the project.
+- `docs/problem-definition.md`: currently empty and does not document the project.
 
----
+Related note:
 
-## 📊 Datenbanken
+- `documentation.md` in the repository root matches the implemented feedback and evaluation logic better than the empty files in `docs/`.
 
-Das System verwendet SQLite für persistente Speicherung:
+## Known Gaps Between Docs and Code
 
-- **results.db**: Analyse-Ergebnisse und Vorhersagen
-- **feedback.db**: Benutzer-Feedback zur Modell-Bewertung
+- The code contains hardcoded LM Studio connection values instead of a documented environment-based setup.
+- The frontend language is currently German, while this README is in English.
+- There are no automated tests even though the project has evaluation-related logic that would benefit from them.
+- The repository still includes local database files, which may not be ideal for distribution.
 
----
+## License
 
-## 🔧 Troubleshooting
-
-### Problem: "Remote nicht erreichbar"
-
-**Lösung:**
-
-1. LM Studio Server starten
-2. In LM Studio: Settings → Server → Port auf `1234` setzen
-3. CORS in den Einstellungen aktivieren
-4. IP-Adresse prüfen (ob Remote oder Local)
-
-### Problem: "Model nicht gefunden"
-
-**Lösung:**
-
-1. Modell in LM Studio herunterladen
-2. Unter Models im Tab auswählen
-3. Server neu starten
-
-### Problem: "Port bereits belegt"
-
-**Lösung:**
-
-1. Andere Port-Nummer verwenden (in `server.js`)
-2. Oder bestehenden Prozess beenden
-
----
-
-## 🤝 Beiträge
-
-Dieses Projekt dient als Proof-of-Concept für lokale KI-gestützte Müllklassifizierung.
-
-Für Fragen oder Issues: Bitte die Dokumentation in `docs/` konsultieren.
+See `LICENSE`.
