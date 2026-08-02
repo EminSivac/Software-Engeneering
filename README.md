@@ -1,48 +1,237 @@
-# 🗑️ Müll-Erkennung mit AI (LM Studio)
+# 🗑️ AI Müllvergleich - Waste Classification System
 
-Ein einfaches Tool zur automatischen Müllklassifizierung anhand von Bildern.
-Das System nutzt ein lokales Vision-Language-Modell über LM Studio.
+Ein lokales KI-basiertes System zur automatischen Müllklassifizierung. Das Tool analysiert Bilder von Abfällen und empfiehlt den richtigen Behälter, unterstützt durch mehrere Vision-Language-Modelle.
 
-## 🚀 Features
+---
 
-- 📷 Bild-Upload im Browser
-- 🤖 Lokale KI (kein Cloud-Zwang)
-- ♻️ Müllklassifizierung:
-  - Müllart (Papier, Plastik, etc.)
-  - Richtiger Behälter
-  - Sicherheitseinschätzung
-- ⚡ Schnelle Verarbeitung (lokal)
+## 🎯 Was macht dieses Projekt?
 
-## 🧱 Architektur
+- **Bildanalyse**: Laden Sie ein Bild eines Abfallstücks hoch
+- **KI-Klassifizierung**: Mehrere lokale KI-Modelle analysieren das Bild parallel
+- **Vergleich**: Sehen Sie die Ergebnisse aller Modelle nebeneinander
+- **Empfehlung**: Das System schlägt den korrekten Müllbehälter vor
+- **Feedback**: Geben Sie Rückmeldungen, um die KI zu verbessern
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1️⃣ Voraussetzungen prüfen
+
+**Benötigte Software:**
+
+```bash
+# Node.js installieren (Version 18 oder höher)
+# Herunterladen von: https://nodejs.org/
+
+# LM Studio installieren (für lokale KI-Modelle)
+# Herunterladen von: https://lmstudio.ai/
+```
+
+### 2️⃣ Projekt vorbereiten
+
+```bash
+# Zum Projekt-Verzeichnis wechseln
+cd ...
+
+# Abhängigkeiten installieren
+npm install
+```
+
+### 3️⃣ KI-Modelle in LM Studio laden
+
+Öffnen Sie **LM Studio** und laden Sie mindestens eines dieser Modelle:
+
+- `ministral-3-3b-instruct-2512` (schnell, weniger Ressourcen)
+- `qwen/qwen3.5-9b` (empfohlen, gute Balance)
+- `google/gemma-4-e4b` (alternative Option)
+
+**Wichtig**: Die Modelle müssen lokal installiert sein - keine Cloud-APIs verwenden!
+
+### 4️⃣ System starten
+
+```bash
+# LM Studio Server starten
+# - Port: 1234
+# - CORS aktivieren (in den Einstellungen)
+# - Server-Status sollte "Running" anzeigen
+
+# Backend starten
+node server.js
+
+# Frontend öffnen
+# http://localhost:3000
+# Oder: http://{Ihr_IP}:3000 (für andere Geräte)
+```
+
+---
+
+## 📖 Verwendung
+
+1. **Bild hochladen**: Klicken Sie auf "Choose File" und wählen Sie ein Bild aus
+2. **Analysieren**: Klicken Sie auf den "Analysieren"-Button
+3. **Ergebnisse sehen**: Vergleichen Sie die Klassifizierungen aller KI-Modelle
+4. **Feedback geben**: Markieren Sie korrekte oder falsche Vorhersagen
+
+---
+
+## 🏗️ Architektur
 
 ```
-Frontend (HTML/JS)
-    ↓
-Node.js Backend (Express)
-    ↓
-LM Studio (VLM Model)
+┌─────────────┐
+│   User      │
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│ Frontend    │  ← HTML/CSS/JavaScript
+│ (public/)   │     - Bild-Upload
+│             │     - Ergebnis-Anzeige
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│ Backend     │  ← Node.js + Express
+│ (server.js) │     - API Endpoints
+│             │     - Queue Management
+└──────┬──────┘
+       ├───────────────┐
+       ↓               ↓
+┌─────────────┐  ┌─────────────┐
+│ LM Studio   │  │ SQLite DB   │
+│ API         │  │ (results.db)│
+└─────────────┘  └─────────────┘
+     Vision Language Models
+     - Qwen
+     - Gemma
+     - Ministral
 ```
 
-👉 Wichtig:
-Das Frontend spricht nicht direkt mit LM Studio.
+---
 
-## 📦 Voraussetzungen
+## 📁 Projektstruktur
 
-Node.js (>= 18)
+```
+Software-Engineering/
+├── server.js          # Haupt-Backend Logik
+├── package.json       # Node.js Abhängigkeiten
+├── public/            # Frontend Dateien
+│   ├── index.html     # Hauptseite
+│   └── style.css      # Styling
+├── docs/              # Dokumentation
+│   ├── architecture.md
+│   ├── requirements.md
+│   └── ai-reflection.md
+├── uploads/           # Temporäre Bild-Uploads
+└── *.db               # SQLite Datenbanken
+```
 
-LM Studio installiert
+---
 
-Installiertes Modell: `mistralai/mistral-7b-instruct-v0.3`, `qwen/qwen3.5-9b`, `google/gemma-4-e4b`
+## 🎯 API Endpoints
 
-## ⚙️ Installation
+### POST `/analyze`
 
-### ▶️ Start
+Bild hochladen zur Analyse
 
-1. LM Studio starten
-   - Server aktivieren (Port: 1234)
-     - CORS aktivieren
-2. Backend starten
-   - `node server.js` im Projekt-Pfad eingeben
-   - `Server läuft auf: http://localhost:3000`
-3. Frontend öffnen
-   - Einfach `http://localhost:3000` ode `http://{ip_des_geräts}:3000` aufrufen
+**Request:**
+
+- `multipart/form-data` mit Feld `image`
+
+**Response:**
+
+```json
+{
+  "jobId": "1234567890"
+}
+```
+
+### GET `/status/:id`
+
+Status einer Analyse abrufen
+
+**Response:**
+
+```json
+{
+  "jobId": "1234567890",
+  "status": "completed",
+  "step": "Ergebnis",
+  "position": 0,
+  "result": {
+    "model": "qwen/qwen3.5-9b",
+    "data": { ... }
+  }
+}
+```
+
+---
+
+## 🛠️ Konfiguration
+
+### LM Studio IP-Adresse
+
+In `server.js` können Sie die Verbindungsparameter anpassen:
+
+```javascript
+// Remote LM Studio (für Netzwerk-Zugriff)
+const LMSTUDIOIP = "ws://{remote IP}:1234";
+
+// Lokaler LM Studio
+const LOCAL_HOST = "ws://{localhost}:1234";
+```
+
+### Verfügbare Modelle
+
+Das System unterstützt mehrere Modelle gleichzeitig:
+
+```javascript
+MODELS = [
+  "ministral-3-3b-instruct-2512",
+  "google/gemma-4-e4b",
+  "qwen/qwen3.5-9b",
+];
+```
+
+---
+
+## 📊 Datenbanken
+
+Das System verwendet SQLite für persistente Speicherung:
+
+- **results.db**: Analyse-Ergebnisse und Vorhersagen
+- **feedback.db**: Benutzer-Feedback zur Modell-Bewertung
+
+---
+
+## 🔧 Troubleshooting
+
+### Problem: "Remote nicht erreichbar"
+
+**Lösung:**
+
+1. LM Studio Server starten
+2. In LM Studio: Settings → Server → Port auf `1234` setzen
+3. CORS in den Einstellungen aktivieren
+4. IP-Adresse prüfen (ob Remote oder Local)
+
+### Problem: "Model nicht gefunden"
+
+**Lösung:**
+
+1. Modell in LM Studio herunterladen
+2. Unter Models im Tab auswählen
+3. Server neu starten
+
+### Problem: "Port bereits belegt"
+
+**Lösung:**
+
+1. Andere Port-Nummer verwenden (in `server.js`)
+2. Oder bestehenden Prozess beenden
+
+---
+
+## 🤝 Beiträge
+
+Dieses Projekt dient als Proof-of-Concept für lokale KI-gestützte Müllklassifizierung.
+
+Für Fragen oder Issues: Bitte die Dokumentation in `docs/` konsultieren.
