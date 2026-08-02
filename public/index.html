@@ -72,10 +72,41 @@
             <span class="value">${data.sicherheit || "-"}</span>
           </div>
 
+          <div class="field">
+            <span class="label">Prediction Reliability:</span>
+            <span class="value">
+              ${data.predictionReliability !== null
+                ? `${data.predictionReliability}% (${data.reliabilitySamples})`
+                : "No data"}
+            </span>
+          </div>
+
+          <div class="field">
+            <span class="label">Category Detection Rate:</span>
+            <span class="value">
+              ${data.categoryDetectionRate !== null
+                ? `${data.categoryDetectionRate}% (${data.detectionSamples})`
+                : "No data"}
+            </span>
+          </div>
+
           <div class="vote-buttons">
             <button onclick="sendModelFeedback('${model}', 'yes')">Correct</button>
-            <button onclick="sendModelFeedback('${model}', 'no')">Wrong</button>
+            <button onclick="showCorrection('${model}')">Wrong</button>
             <button onclick="sendModelFeedback('${model}', 'dont_know')">Don't know</button>
+          </div>
+
+          <div id="correction-${model}" style="display:none; margin-top:10px;">
+            <select id="material-${model}">
+              <option value="Papier">Papier</option>
+              <option value="Plastic/Verpackungen">Plastic/Verpackungen</option>
+              <option value="Bio/Organisch">Bio/Organisch</option>
+              <option value="Restmüll">Restmüll</option>
+            </select>
+
+            <button onclick="submitCorrection('${model}')">
+              Speichern
+            </button>
           </div>
         `;
 
@@ -139,10 +170,15 @@
               models: Object.entries(raw)
                 .filter(([key]) => key !== "NameItem")
                 .map(([model, value]) => ({
+                  id: value.id,
                   model: model,
-                  material: raw.NameItem,
+                  material: value.müllart,
                   bin: value.behälter,
-                  safety: value.sicherheit
+                  safety: value.sicherheit,
+                  predictionReliability: value.predictionReliability,
+                  reliabilitySamples: value.reliabilitySamples,
+                  categoryDetectionRate: value.categoryDetectionRate,
+                  detectionSamples: value.detectionSamples
                 }))
             };
               // Ergebnis wie vorher anzeigen
@@ -151,9 +187,14 @@
 
               currentResult.models.forEach((m) => {
                 resultsDiv.appendChild(createCard(m.model, {
+                  id: m.id,
                   müllart: m.material,
                   behälter: m.bin,
-                  sicherheit: m.safety
+                  sicherheit: m.safety,
+                  predictionReliability: m.predictionReliability,
+                  reliabilitySamples: m.reliabilitySamples,
+                  categoryDetectionRate: m.categoryDetectionRate,
+                  detectionSamples: m.detectionSamples
                 }));
               });
             }
@@ -161,7 +202,7 @@
             if (data.status === "error") {
               clearInterval(interval);
               spinner.style.display = "none";
-              itemDiv.textContent = "Fehler!";
+              itemDiv.innerHTML = `<strong>Fehler:</strong><br/>${data.step || "unknown error"}`;
             }
           } catch (err) {
             clearInterval(interval);
@@ -170,7 +211,8 @@
           }
         }, 1000);
       }
-          async function sendModelFeedback(model, value) {
+          async function sendModelFeedback(model, value, correctMaterial = null) {
+
             if (!currentResult) return;
 
             const modelData = currentResult.models.find(m => m.model === model);
@@ -181,8 +223,10 @@
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
+                resultId: modelData.id,
                 model: model,
-                material: currentResult.name,
+                material: modelData.material,
+                actualMaterial: correctMaterial,
                 bin: modelData?.bin,
                 safety: modelData?.safety,
                 feedback: value
@@ -191,6 +235,18 @@
 
             alert(`Feedback saved for ${model}`);
           }
+
+          function showCorrection(model){
+            document.getElementById(`correction-${model}`).style.display = "block";
+
+          }
+
+          async function submitCorrection(model){
+            const correctMaterial = document.getElementById(`material-${model}`).value;
+            await sendModelFeedback(model,"no",correctMaterial);
+            document.getElementById(`correction-${model}`).style.display = "none";
+
+}
     </script>
   </body>
 </html>

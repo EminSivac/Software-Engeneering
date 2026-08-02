@@ -18,7 +18,7 @@ let MODELS;
 let VLM;
 
 MODELS = [
-  "mistralai/mistral-7b-instruct-v0.3",
+  "ministral-3-3b-instruct-2512",
   "google/gemma-4-e4b",
   "qwen/qwen3.5-9b",
 ];
@@ -33,6 +33,7 @@ let running = false;
 const resultsDb = new Database("results.db");
 const feedbackDb = new Database("feedback.db");
 createTable();
+createFeedbackTable();
 
 // Express Setup
 const app = express();
@@ -110,6 +111,7 @@ app.listen(3000, () => console.log("Server läuft auf Port 3000"));
 async function WastEvaluation(req, job) {
   console.log(queue);
   let results = [];
+  let resultsId =[];
 
   job.step = "Objekt wird erkannt";
 
@@ -131,10 +133,14 @@ async function WastEvaluation(req, job) {
   for (let i = 0; i < MODELS.length; i++) {
     const raw = results[i].nonReasoningContent || results[i].content || "";
 
-    insertResult(MODELS[i], extractJSON(raw), results[i].stats.totalTimeSec);
+    const aiResult = safeParse(raw);
+
+    const resultId = insertResult(MODELS[i], aiResult?.müllart || "Unbekannt",results[i].stats.totalTimeSec);
+
+    resultsId.push(resultId);
   }
 
-  return JsonCompose(results, nameItem);
+  return JsonCompose(results, nameItem, resultsId);
 }
 
 async function processQueue() {
@@ -155,8 +161,10 @@ async function processQueue() {
     job.status = "done";
     job.step = "Fertig";
   } catch (err) {
+    console.error("JOB ERROR:", err);
     job.status = "error";
-    job.step = err.message;
+    job.step = err.message || String(err);
+
   }
 
   running = false;
@@ -179,7 +187,7 @@ function safeParse(text) {
   }
 }
 
-function JsonCompose(results, nameItemResult) {
+function JsonCompose(results, nameItemResult, resultsId) {
   const output = {
     NameItem: nameItemResult,
   };
@@ -196,11 +204,27 @@ function JsonCompose(results, nameItemResult) {
       parsed = { error: "invalid json", raw };
     }
 
-    output[model] = parsed;
-  });
+    const reliability = parsed
+  ? getPredictionReliability(model, parsed.müllart)
+  : { accuracy: null, samples: 0 };
 
-  return output;
-}
+    const detection = parsed
+  ? getCategoryDetectionRate(model, parsed.müllart)
+  : { accuracy: null, samples: 0 };
+
+    output[model] = {
+        id: resultsId[index],
+        ...parsed,
+        predictionReliability: reliability.accuracy,
+        reliabilitySamples: reliability.samples,
+
+        categoryDetectionRate: detection.accuracy,
+        detectionSamples: detection.samples
+
+    };
+  });
+    return output;
+  }
 
 async function GetAIResponse(AiModel, ItemName) {
   const model = await client.llm.model(AiModel);
@@ -282,15 +306,17 @@ function cleanJSONString(str) {
   return str.replace(/\n/g, "").replace(/\r/g, "").replace(/\t/g, "").trim();
 }
 
-function insertResult(model, response, latency) {
+function insertResult(model, predicted_material, latency) {
   const insert = resultsDb.prepare(
-    "INSERT INTO results (model, response, latency) VALUES (?, ?, ?)",
+    "INSERT INTO results (model, predicted_material, actual_material, correct, latency) VALUES (?, ?, NULL, NULL, ?)",
   );
-  insert.run(model, response, latency);
+  const info = insert.run(model, predicted_material, latency);
+
+  return info.lastInsertRowid;
 }
 
 app.post("/feedback", (req, res) => {
-  const { model, material, bin, safety, feedback } = req.body;
+  const { resultId, model, material, actualMaterial, bin, safety, feedback } = req.body;
 
   feedbackDb
     .prepare(
@@ -300,6 +326,20 @@ app.post("/feedback", (req, res) => {
   `,
     )
     .run(model, material, bin, safety, feedback);
+
+    if (feedback === "yes" || feedback === "no") {
+
+    resultsDb.prepare(`
+        UPDATE results
+        SET correct = ? , actual_material = ?
+        WHERE id = ?
+    `).run(
+        feedback === "yes" ? 1 : 0,
+        feedback === "yes" ? material : actualMaterial,
+        resultId
+    );
+
+}
 
   res.json({ success: true });
 });
@@ -311,7 +351,9 @@ function createTable() {
   CREATE TABLE IF NOT EXISTS results (
     id INTEGER PRIMARY KEY,
     model TEXT,
-    response TEXT,
+    predicted_material TEXT, 
+    actual_material TEXT,
+    correct BOOLEAN, 
     latency INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
@@ -319,6 +361,7 @@ function createTable() {
     )
     .run();
 }
+//response ist jetzt predicted material, also das was die KI vorhersagt 
 
 function createFeedbackTable() {
   feedbackDb
@@ -334,4 +377,46 @@ function createFeedbackTable() {
     )`,
     )
     .run();
+}
+
+function getPredictionReliability(model, material) {
+  const row = resultsDb.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(correct) as correct
+    FROM results
+    WHERE model = ?
+      AND predicted_material = ?
+      AND correct IS NOT NULL
+  `).get(model, material);
+
+  if (!row.total) return { accuracy: null, samples: 0 };
+
+  return {
+    accuracy: Math.round((row.correct / row.total) * 100),
+    samples: row.total
+  };
+}
+
+function getCategoryDetectionRate(model, material) {
+  const row = resultsDb.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(
+        CASE
+          WHEN predicted_material = actual_material
+          THEN 1 ELSE 0
+        END
+      ) as correct
+    FROM results
+    WHERE model = ?
+      AND actual_material = ?
+  `).get(model, material);
+
+  if (!row.total) return { accuracy: null, samples: 0 };
+
+  return {
+    accuracy: Math.round((row.correct / row.total) * 100),
+    samples: row.total
+  };
 }
